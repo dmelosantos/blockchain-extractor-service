@@ -1,0 +1,37 @@
+{
+  "name": "blockchain-extractor-service",
+  "version": "1.0.0",
+  "description": "Service that reads blockchain networks and process their information",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "test": "jest --coverage",
+    "lint": "tslint -c tslint.json 'src/**/*.ts'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dmelosantos/blockchain-extractor-service.git"
+  },
+  "author": "Daniel Santos",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dmelosantos/blockchain-extractor-service/issues"
+  },
+  "homepage": "https://github.com/dmelosantos/blockchain-extractor-service#readme",
+  "keywords": [
+    "Blockchain",
+    "Ethereum",
+    "ETL"
+  ],
+  "devDependencies": {
+    "@types/jest": "^24.0.23",
+    "jest": "^24.9.0",
+    "ts-jest": "^24.2.0"
+  },
+  "dependencies": {
+    "typescript": "^3.7.2"
+  }
+}
