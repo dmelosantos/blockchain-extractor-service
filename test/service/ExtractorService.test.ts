@@ -1,4 +1,4 @@
-import {Chain, EthereumClient, EthereumNetworkType} from "../../src/commons/constants";
+import {Chain, EthereumClient, EthereumNetworkType} from "../../src/commons/Constants";
 import ExtractorService from "../../src/service/ExtractorService";
 
 describe("ExtractorService Test Suite", () => {

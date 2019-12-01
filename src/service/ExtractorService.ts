@@ -1,4 +1,4 @@
-import {Chain} from "../commons/constants";
+import {Chain} from "../commons/Constants";
 import BlockchainNetwork from "../model/BlockchainNetwork";
 import EthereumNetwork from "../model/EthereumNetwork";
 
