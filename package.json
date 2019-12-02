@@ -38,7 +38,11 @@
   },
   "dependencies": {
     "@types/compression": "^1.0.1",
+    "@types/request-promise-native": "^1.0.17",
     "@types/socket.io": "^2.1.4",
+    "@types/socket.io-client": "^1.4.32",
+    "@types/websocket": "^1.0.0",
+    "@types/ws": "^6.0.4",
     "compression": "^1.7.4",
     "dotenv": "^8.2.0",
     "express": "^4.17.1",

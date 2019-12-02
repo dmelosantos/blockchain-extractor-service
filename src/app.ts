@@ -15,30 +15,25 @@ declare var process: {
         BLOCKCHAIN: string,
         CLIENT: string,
         NETWORK_TYPE: string,
+        WS_CONNECTION_STRING: string,
     },
 };
 
 const app = express();
 const httpServer = http.createServer(app);
-const socketIO = io(httpServer);
 
 const chainString: string = process.env.BLOCKCHAIN;
 const client: string = process.env.CLIENT;
 const network: string = process.env.NETWORK_TYPE;
+const webSocketConnectionString: string = process.env.WS_CONNECTION_STRING;
 
 const chain = Chain[chainString as keyof typeof Chain];
 
-const extractorService = new ExtractorService(chain, client, network);
-
 app.use(express.static(path.join(__dirname, "public")));
 
-socketIO.on("connection", (socket) => {
-    logger.info("a user connected");
-    socket.on("disconnect", () => {
-        logger.info("user disconnected");
-    });
-});
-
 httpServer.listen(3000, () => {
+    const extractorService = new ExtractorService(chain, client, network, webSocketConnectionString);
+    extractorService.start();
+
     logger.info("listening on *:3000");
 });
