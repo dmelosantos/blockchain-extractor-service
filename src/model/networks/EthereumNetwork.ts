@@ -41,11 +41,8 @@ export default class EthereumNetwork extends BlockchainNetwork {
         this.currentBlock = responseEarliestBlock;
         this.latestBlock = responseLatestBlock;
 
-        // then pull data from the first block to the latest
-        this.pullBlock(this.currentBlock);
-
         // the register to the websocket and start adding from there
-
+        setInterval(() => this.pullBlock(this.currentBlock), EthereumNetwork.PULL_DATA_INTERVAL);
     }
 
     /**
@@ -84,17 +81,9 @@ export default class EthereumNetwork extends BlockchainNetwork {
 
         // TODO add to database or buffer to database
         logger.debug(response.result);
+        this.currentBlock = `0x${(parseInt(blockNumber, 16) + 1).toString(16)}`;
 
-        // TODO pull all transactions information from this block
-        if (response.result) {
-            this.currentBlock = response.result.number;
-        }
-        const nextBlock: string = `0x${(parseInt(blockNumber, 16) + 1).toString(16)}`;
-
-        if (nextBlock !== this.latestBlock) {
-            setTimeout(() => this.pullBlock(nextBlock), EthereumNetwork.PULL_DATA_INTERVAL);
-        }
-
+        logger.debug("----------------------------");
         return response.result ? response.result.number : null;
     }
 
