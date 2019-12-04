@@ -1,7 +1,9 @@
 // import Socket = SocketIOClient.Socket;
 // import * as socketIo from "socket.io-client";
+import {Queue} from "kue";
 import * as request from "request-promise-native";
 import WebSocket from "ws";
+import Blocks from "../../entity/Blocks";
 import logger from "../../logger";
 import BlockchainNetwork from "./BlockchainNetwork";
 
@@ -10,7 +12,7 @@ export default class EthereumNetwork extends BlockchainNetwork {
     /**
      * Static variable representing the timing interval to do request operations on the Nodes to avoid throttling
      */
-    private static PULL_DATA_INTERVAL: number = 2000;
+    private static PULL_DATA_INTERVAL: number = 200;
 
     private static BLOCK_PARTITION: number = 1000000;
 
@@ -19,10 +21,13 @@ export default class EthereumNetwork extends BlockchainNetwork {
 
     private latestBlock!: string;
     private currentBlock!: string;
+    private databaseQueue: Queue;
 
     constructor(chain: string, client: string, network: string, webSocketConnectionString: string,
-                rpcConnectionString: string) {
+                rpcConnectionString: string, databaseQueue: Queue) {
         super(chain, client, network, webSocketConnectionString, rpcConnectionString);
+
+        this.databaseQueue = databaseQueue;
     }
 
     public connect(): void {
@@ -44,10 +49,10 @@ export default class EthereumNetwork extends BlockchainNetwork {
         const responseEarliestBlock = await this.pullBlock("earliest");
         const responseLatestBlock = await this.pullBlock("latest");
 
-        this.currentBlock = responseEarliestBlock;
-        this.latestBlock = responseLatestBlock;
+        this.currentBlock = responseEarliestBlock ? responseEarliestBlock : "0x0";
+        this.latestBlock = responseLatestBlock  ? responseLatestBlock : "0x0";
 
-        // the register to the websocket and start adding from there
+        // starting adding blockings to the queue
         setInterval(() => this.pullBlock(this.currentBlock), EthereumNetwork.PULL_DATA_INTERVAL);
     }
 
@@ -71,7 +76,7 @@ export default class EthereumNetwork extends BlockchainNetwork {
      * Method responsible for fetching blocks (with intermittent timeout to avoid throttling)
      * @param blockNumber the block number to do rpc call and get all information
      */
-    public async pullBlock(blockNumber: string): Promise<string> {
+    public async pullBlock(blockNumber: string): Promise<string | null> {
         logger.debug(`Pulling blocks ${blockNumber}`);
 
         // update the block for the next interval to fetch
@@ -89,11 +94,24 @@ export default class EthereumNetwork extends BlockchainNetwork {
             },
         });
 
-        // TODO add to database or buffer to database
-        logger.debug(response.result);
+        const fetchedBlock = response.result;
+        if (fetchedBlock) {
 
-        logger.debug("----------------------------");
-        return response.result ? response.result.number : null;
+            // logger.debug(fetchedBlock);
+
+            const block = new Blocks(fetchedBlock.blockNumber, fetchedBlock.hash, fetchedBlock.parentHash,
+                fetchedBlock.nonce, fetchedBlock.sha3Uncles, fetchedBlock.logsBloom, fetchedBlock.transactionsRoot,
+                fetchedBlock.stateRoot, fetchedBlock.receiptsRoot, fetchedBlock.miner, fetchedBlock.difficulty,
+                fetchedBlock.totalDifficulty, fetchedBlock.size, fetchedBlock.extraData, fetchedBlock.gasLimit,
+                fetchedBlock.gasUsed, fetchedBlock.timestamp, fetchedBlock.transactionCount);
+
+            this.databaseQueue.createJob("blocks", block).save();
+
+            // logger.debug("----------------------------");
+
+            return fetchedBlock.blockNumber;
+        }
+        return null;
     }
 
     private async pullTransactions(transactions: [string]): Promise<void> {

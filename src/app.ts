@@ -3,7 +3,10 @@ import express from "express";
 import path from "path";
 
 import http from "http";
+import { createQueue } from "kue";
+import "reflect-metadata";
 import io from "socket.io";
+import {createConnection} from "typeorm";
 import {Chain} from "./commons/Constants";
 import logger from "./logger";
 import ExtractorService from "./service/ExtractorService";
@@ -20,9 +23,6 @@ declare var process: {
     },
 };
 
-const app = express();
-const httpServer = http.createServer(app);
-
 // we can use process.env direct on the code, but I wanted to decouple the module from that
 // so I decided to initialize then on the startup of express app
 const chainString: string = process.env.BLOCKCHAIN;
@@ -32,13 +32,28 @@ const webSocketConnectionString: string = process.env.WS_CONNECTION_STRING;
 const rpcConnectionString: string = process.env.RPC_CONNECTION_STRING;
 const chain = Chain[chainString as keyof typeof Chain];
 
-// serve built vue app from here
-app.use(express.static(path.join(__dirname, "public")));
+class ExpressApp {
 
-httpServer.listen(3000, () => {
-    const extractorService = new ExtractorService(chain, client, network, webSocketConnectionString,
-        rpcConnectionString);
-    extractorService.start();
+    public start(): void {
+        this.configureExpress();
+    }
 
-    logger.info("listening on *:3000");
-});
+    private configureExpress(): void {
+        const app = express();
+        const httpServer = http.createServer(app);
+
+        // serve built vue app from here
+        app.use(express.static(path.join(__dirname, "public")));
+
+        httpServer.listen(3000, () => {
+            const extractorService = new ExtractorService(chain, client, network, webSocketConnectionString,
+                rpcConnectionString);
+            extractorService.start();
+
+            logger.info("listening on *:3000");
+        });
+    }
+}
+
+const expressApp = new ExpressApp();
+expressApp.start();

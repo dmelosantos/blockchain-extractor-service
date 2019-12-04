@@ -1,10 +1,11 @@
-import {Column, Entity, PrimaryGeneratedColumn} from "typeorm";
+import {Column, Entity, PrimaryColumn} from "typeorm";
 
 /**
  * Class representing blocks in Chain Networks
  */
+@Entity()
 export default class Blocks {
-    @PrimaryGeneratedColumn()
+    @PrimaryColumn()
     private blockNumber: number;
 
     @Column()
