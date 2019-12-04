@@ -6,15 +6,18 @@ export default abstract class BlockchainNetwork {
     protected client: string;
     protected network: string;
     protected webSocketConnectionString: string;
+    protected rpcConnectionString: string;
 
-    constructor(chain: string, client: string, network: string, webSocketConnectionString: string) {
+    constructor(chain: string, client: string, network: string, webSocketConnectionString: string,
+                rpcConnectionString: string) {
         this.chain = chain;
         this.client = client;
         this.network = network;
         this.webSocketConnectionString = webSocketConnectionString;
+        this.rpcConnectionString = rpcConnectionString;
     }
 
     public abstract connect(): void;
-    public abstract pullData(): string;
+    public abstract async pullData(): Promise<void>;
     public abstract poll(): void;
 }
