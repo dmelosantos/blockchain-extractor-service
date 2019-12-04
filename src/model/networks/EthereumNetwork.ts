@@ -1,24 +1,27 @@
-// import Socket = SocketIOClient.Socket;
-// import * as socketIo from "socket.io-client";
 import {Queue} from "kue";
 import * as request from "request-promise-native";
+import {Connection} from "typeorm";
+import {query} from "winston";
 import WebSocket from "ws";
-import Block from "../../entity/Block";
+import {MigrationType} from "../../commons/Constants";
 import logger from "../../logger";
 import BlockchainNetwork from "./BlockchainNetwork";
 
 export default class EthereumNetwork extends BlockchainNetwork {
+
+    private static QUERY_SELECT_FIRST_BLOCK_RPC = `select min(id) as startingBlock from block where migrationType=${MigrationType.RPC.toString()}`;
 
     /**
      * Static variable representing the timing interval to do request operations on the Nodes to avoid throttling
      */
     private static PULL_DATA_INTERVAL: number = 200;
 
+    private static MAX_RETRIES: number = 10;
+
     // private socket!: Socket;
     private socket!: WebSocket;
 
     private latestBlock!: string;
-    private currentBlock!: string;
     private databaseQueue: Queue;
 
     constructor(chain: string, client: string, network: string, webSocketConnectionString: string,
@@ -28,6 +31,9 @@ export default class EthereumNetwork extends BlockchainNetwork {
         this.databaseQueue = databaseQueue;
     }
 
+    /**
+     * Connect websocket and other resources here
+     */
     public connect(): void {
         // this.socket = socketIo.connect(this.webSocketConnectionString);
         this.socket = new WebSocket(this.webSocketConnectionString);
@@ -42,16 +48,20 @@ export default class EthereumNetwork extends BlockchainNetwork {
      * and push it to a Mysql instance.\
      *
      */
-    public async pullData(): Promise<void> {
-        // first get the latest block
-        const responseEarliestBlock = await this.pullBlock("earliest");
+    public async pullData(databaseConnection: Connection): Promise<void> {
+        // fetch first block from the database if exists otherwise from the network
+        const queryResult: any = await databaseConnection.manager.query(EthereumNetwork.QUERY_SELECT_FIRST_BLOCK_RPC);
+        let startBlock: string = queryResult.startingBlock;
+        if (!startBlock) {
+            const responseEarliestBlock = await this.pullBlock("earliest");
+            startBlock = responseEarliestBlock ? responseEarliestBlock : "0x0";
+        }
         const responseLatestBlock = await this.pullBlock("latest");
 
-        this.currentBlock = responseEarliestBlock ? responseEarliestBlock : "0x0";
-        this.latestBlock = responseLatestBlock  ? responseLatestBlock : "0x0";
+        // get the last block
+        this.latestBlock = responseLatestBlock ? responseLatestBlock : "0x0";
 
-        // starting adding blockings to the queue
-        setInterval(() => this.pullBlock(this.currentBlock), EthereumNetwork.PULL_DATA_INTERVAL);
+        this.pullAllBlocks(startBlock);
     }
 
     /**
@@ -73,36 +83,50 @@ export default class EthereumNetwork extends BlockchainNetwork {
     /**
      * Method responsible for fetching blocks (with intermittent timeout to avoid throttling)
      * @param blockNumber the block number to do rpc call and get all information
+     * @param retry variable to control recursive logic of retrying to fetch a block record
      */
-    public async pullBlock(blockNumber: string): Promise<string | null> {
+    public async pullBlock(blockNumber: string, retry?: number | null): Promise<string | null> {
         logger.debug(`Pulling blocks ${blockNumber}`);
 
-        // update the block for the next interval to fetch
-        this.currentBlock = `0x${(parseInt(blockNumber, 16) + 1).toString(16)}`;
+        try {
+            const response = await request.post(this.rpcConnectionString, {
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                json: {
+                    id: "1",
+                    jsonrpc: "2.0",
+                    method: "eth_getBlockByNumber",
+                    params: [blockNumber, true],
+                },
+            });
 
-        const response = await request.post(this.rpcConnectionString, {
-            headers: {
-                "Content-Type": "application/json",
-            },
-            json: {
-                id: "1",
-                jsonrpc: "2.0",
-                method: "eth_getBlockByNumber",
-                params: [blockNumber, false],
-            },
-        });
+            const fetchedBlock = response.result;
+            if (fetchedBlock) {
+                // pass the data to the extractor service so it can process there
+                this.databaseQueue.createJob("blocks", fetchedBlock).save();
 
-        const fetchedBlock = response.result;
-        if (fetchedBlock) {
-            // pass the data to the extractor service so it can process there
-            this.databaseQueue.createJob("blocks", fetchedBlock).save();
-
-            return fetchedBlock.blockNumber;
+                return fetchedBlock.blockNumber;
+            }
+        } catch (e) {
+            logger.error(e);
+            if (!retry || retry < EthereumNetwork.MAX_RETRIES) {
+                this.pullBlock(blockNumber, retry ? retry + 1 : 0);
+            }
         }
         return null;
     }
 
-    private async pullTransactions(transactions: [string]): Promise<void> {
-        logger.debug("Pulling transactions");
+    /**
+     * Pull all blocks by setting timeouts to each call
+     * @param currentBlock
+     */
+    private pullAllBlocks(currentBlock: string) {
+        this.pullBlock(currentBlock);
+
+        const nextBlock = `0x${(parseInt(currentBlock, 16) + 1).toString(16)}`;
+        // starting adding blockings to the queue
+        setTimeout(() => this.pullAllBlocks(nextBlock), EthereumNetwork.PULL_DATA_INTERVAL);
     }
+
 }

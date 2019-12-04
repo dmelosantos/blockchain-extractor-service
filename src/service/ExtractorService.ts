@@ -1,6 +1,6 @@
 import {createQueue, Job, Queue} from "kue";
-import {Connection, ConnectionManager, createConnection, getConnectionManager} from "typeorm";
-import {Chain} from "../commons/Constants";
+import {Connection, createConnection} from "typeorm";
+import {Chain, MigrationType} from "../commons/Constants";
 import Block from "../entity/Block";
 import logger from "../logger";
 import BlockchainNetwork from "../model/networks/BlockchainNetwork";
@@ -10,10 +10,20 @@ import EthereumNetwork from "../model/networks/EthereumNetwork";
  * Extractor Service that pull data (first load with RPC) and listen to new dynamic data through WebSockets
  *
  * This is decoupled from the Chain Network by using queues and abstractions
+ *
+ * Do not add specific chain code to this Service
  */
 export default class ExtractorService {
+
+    /**
+     * Abstraction for the Chain Network
+     */
     private blockchain: BlockchainNetwork;
 
+    /**
+     * Add jobs to this queue to persist events on the database, this allows to do multiple requests on the Chain Node
+     * and queue request on the database in order to avoid performance problems
+     */
     private databaseQueue: Queue = createQueue();
 
     private databaseConnection!: Connection;
@@ -30,15 +40,26 @@ export default class ExtractorService {
         this.databaseQueue.setMaxListeners(20);
     }
 
+    /**
+     * Start the extractor service
+     */
     public async start() {
+
+        logger.debug("Starting Extractor Service");
 
         this.databaseConnection = await createConnection();
         await this.databaseConnection.synchronize();
 
-        this.blockchain.pullData();
+        logger.debug("Database connected");
+
+        this.blockchain.pullData(this.databaseConnection);
+
         this.processQueue();
     }
 
+    /**
+     * Receive information from blockchain network and adds them to the database
+     */
     private processQueue(): void {
         this.databaseQueue.process("blocks", 20, async (job: Job, done: () => void) => {
 
@@ -47,9 +68,11 @@ export default class ExtractorService {
                 fetchedBlock.nonce, fetchedBlock.sha3Uncles, fetchedBlock.logsBloom, fetchedBlock.transactionsRoot,
                 fetchedBlock.stateRoot, fetchedBlock.receiptsRoot, fetchedBlock.miner, fetchedBlock.difficulty,
                 fetchedBlock.totalDifficulty, fetchedBlock.size, fetchedBlock.extraData, fetchedBlock.gasLimit,
-                fetchedBlock.gasUsed, fetchedBlock.timestamp, fetchedBlock.transactionCount);
+                fetchedBlock.gasUsed, fetchedBlock.timestamp, fetchedBlock.transactionCount, MigrationType.RPC);
 
-            await this.databaseConnection.manager.save(block);
+            console.log(block);
+
+            // await this.databaseConnection.manager.save(block);
 
             done();
         });

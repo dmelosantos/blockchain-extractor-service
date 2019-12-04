@@ -1,4 +1,5 @@
 import {Column, Entity, PrimaryColumn} from "typeorm";
+import {MigrationType} from "../commons/Constants";
 
 /**
  * Class representing blocks in Chain Networks
@@ -67,11 +68,17 @@ export default class Block {
     @Column({nullable: true, length: 255})
     private transactionCount: string;
 
+    @Column({
+        enum: MigrationType,
+        type: "enum",
+    })
+    private migrationType: MigrationType;
+
     constructor(id: string, hash: string, parentHash: string, nonce: string, sha3Uncles: string,
                 logsBloom: string, transactionsRoot: string, stateRoot: string,
                 receiptsRoot: string, miner: string, difficulty: string, totalDifficulty: string,
                 size: string, extraData: string, gasLimit: string, gasUsed: string,
-                timestamp: string, transactionCount: string) {
+                timestamp: string, transactionCount: string, migrationType: MigrationType) {
         this.id = id;
         this.hash = hash;
         this.parentHash = parentHash;
@@ -90,5 +97,6 @@ export default class Block {
         this.gasUsed = gasUsed;
         this.timestamp = timestamp;
         this.transactionCount = transactionCount;
+        this.migrationType = migrationType;
     }
 }

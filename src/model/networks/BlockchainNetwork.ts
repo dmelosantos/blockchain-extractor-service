@@ -1,6 +1,8 @@
 /**
  * Abstract class that defines Blockchain Networks
  */
+import {Connection} from "typeorm";
+
 export default abstract class BlockchainNetwork {
     protected chain: string;
     protected client: string;
@@ -8,8 +10,8 @@ export default abstract class BlockchainNetwork {
     protected webSocketConnectionString: string;
     protected rpcConnectionString: string;
 
-    constructor(chain: string, client: string, network: string, webSocketConnectionString: string,
-                rpcConnectionString: string) {
+    protected constructor(chain: string, client: string, network: string, webSocketConnectionString: string,
+                          rpcConnectionString: string) {
         this.chain = chain;
         this.client = client;
         this.network = network;
@@ -18,6 +20,6 @@ export default abstract class BlockchainNetwork {
     }
 
     public abstract connect(): void;
-    public abstract async pullData(): Promise<void>;
+    public abstract async pullData(databaseConnection: Connection): Promise<void>;
     public abstract poll(): void;
 }
