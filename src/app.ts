@@ -48,6 +48,7 @@ class ExpressApp {
         httpServer.listen(3000, () => {
             const extractorService = new ExtractorService(chain, client, network, webSocketConnectionString,
                 rpcConnectionString);
+
             extractorService.start();
 
             logger.info("listening on *:3000");

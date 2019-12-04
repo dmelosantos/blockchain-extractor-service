@@ -3,7 +3,7 @@
 import {Queue} from "kue";
 import * as request from "request-promise-native";
 import WebSocket from "ws";
-import Blocks from "../../entity/Blocks";
+import Block from "../../entity/Block";
 import logger from "../../logger";
 import BlockchainNetwork from "./BlockchainNetwork";
 
@@ -13,8 +13,6 @@ export default class EthereumNetwork extends BlockchainNetwork {
      * Static variable representing the timing interval to do request operations on the Nodes to avoid throttling
      */
     private static PULL_DATA_INTERVAL: number = 200;
-
-    private static BLOCK_PARTITION: number = 1000000;
 
     // private socket!: Socket;
     private socket!: WebSocket;
@@ -96,18 +94,8 @@ export default class EthereumNetwork extends BlockchainNetwork {
 
         const fetchedBlock = response.result;
         if (fetchedBlock) {
-
-            // logger.debug(fetchedBlock);
-
-            const block = new Blocks(fetchedBlock.blockNumber, fetchedBlock.hash, fetchedBlock.parentHash,
-                fetchedBlock.nonce, fetchedBlock.sha3Uncles, fetchedBlock.logsBloom, fetchedBlock.transactionsRoot,
-                fetchedBlock.stateRoot, fetchedBlock.receiptsRoot, fetchedBlock.miner, fetchedBlock.difficulty,
-                fetchedBlock.totalDifficulty, fetchedBlock.size, fetchedBlock.extraData, fetchedBlock.gasLimit,
-                fetchedBlock.gasUsed, fetchedBlock.timestamp, fetchedBlock.transactionCount);
-
-            this.databaseQueue.createJob("blocks", block).save();
-
-            // logger.debug("----------------------------");
+            // pass the data to the extractor service so it can process there
+            this.databaseQueue.createJob("blocks", fetchedBlock).save();
 
             return fetchedBlock.blockNumber;
         }
