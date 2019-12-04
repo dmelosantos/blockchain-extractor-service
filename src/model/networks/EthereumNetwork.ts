@@ -12,6 +12,8 @@ export default class EthereumNetwork extends BlockchainNetwork {
      */
     private static PULL_DATA_INTERVAL: number = 2000;
 
+    private static BLOCK_PARTITION: number = 1000000;
+
     // private socket!: Socket;
     private socket!: WebSocket;
 
@@ -32,6 +34,10 @@ export default class EthereumNetwork extends BlockchainNetwork {
      * Method to do extraction from the selected Ethereum Network
      * This does the initial pull of the earliest to the latest block
      * The polling method is responsible for updating new information only
+     *
+     * Resolves: Create a Typescript server/job/script to pull data from an Ethereum client (ie. Parity)
+     * and push it to a Mysql instance.\
+     *
      */
     public async pullData(): Promise<void> {
         // first get the latest block
@@ -48,6 +54,7 @@ export default class EthereumNetwork extends BlockchainNetwork {
     /**
      * Method to poll on the Ethereum network with updated information
      * Use this to connect to websockets and get realtime information using WebSockets
+     *
      */
     public async poll(): Promise<void> {
 
@@ -64,8 +71,11 @@ export default class EthereumNetwork extends BlockchainNetwork {
      * Method responsible for fetching blocks (with intermittent timeout to avoid throttling)
      * @param blockNumber the block number to do rpc call and get all information
      */
-    private async pullBlock(blockNumber: string): Promise<string> {
+    public async pullBlock(blockNumber: string): Promise<string> {
         logger.debug(`Pulling blocks ${blockNumber}`);
+
+        // update the block for the next interval to fetch
+        this.currentBlock = `0x${(parseInt(blockNumber, 16) + 1).toString(16)}`;
 
         const response = await request.post(this.rpcConnectionString, {
             headers: {
@@ -81,7 +91,6 @@ export default class EthereumNetwork extends BlockchainNetwork {
 
         // TODO add to database or buffer to database
         logger.debug(response.result);
-        this.currentBlock = `0x${(parseInt(blockNumber, 16) + 1).toString(16)}`;
 
         logger.debug("----------------------------");
         return response.result ? response.result.number : null;
