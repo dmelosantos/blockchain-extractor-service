@@ -9,12 +9,12 @@ import BlockchainNetwork from "./BlockchainNetwork";
 
 export default class EthereumNetwork extends BlockchainNetwork {
 
-    private static QUERY_SELECT_FIRST_BLOCK_RPC = `select min(id) as startingBlock from block where migrationType=${MigrationType.RPC.toString()}`;
+    private static QUERY_SELECT_FIRST_BLOCK_RPC = `select max(id) as startingBlock from block where migrationType='${MigrationType.RPC}'`;
 
     /**
      * Static variable representing the timing interval to do request operations on the Nodes to avoid throttling
      */
-    private static PULL_DATA_INTERVAL: number = 200;
+    private static PULL_DATA_INTERVAL: number = 500;
 
     private static MAX_RETRIES: number = 10;
 
@@ -51,17 +51,20 @@ export default class EthereumNetwork extends BlockchainNetwork {
     public async pullData(databaseConnection: Connection): Promise<void> {
         // fetch first block from the database if exists otherwise from the network
         const queryResult: any = await databaseConnection.manager.query(EthereumNetwork.QUERY_SELECT_FIRST_BLOCK_RPC);
-        let startBlock: string = queryResult.startingBlock;
+        // TODO does typeorm has get single result?
+        let startBlock: string | null = queryResult.length > 0 ?
+            `0x${(parseInt(queryResult[0].startingBlock, 16) + 1).toString(16)}` : null;
         if (!startBlock) {
             const responseEarliestBlock = await this.pullBlock("earliest");
             startBlock = responseEarliestBlock ? responseEarliestBlock : "0x0";
         }
+
         const responseLatestBlock = await this.pullBlock("latest");
 
         // get the last block
         this.latestBlock = responseLatestBlock ? responseLatestBlock : "0x0";
 
-        this.pullAllBlocks(this.latestBlock);
+        this.pullAllBlocks(startBlock);
     }
 
     /**
