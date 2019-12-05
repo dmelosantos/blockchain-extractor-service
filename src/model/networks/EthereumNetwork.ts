@@ -51,19 +51,19 @@ export default class EthereumNetwork extends BlockchainNetwork {
     public async pullData(databaseConnection: Connection): Promise<void> {
         // fetch first block from the database if exists otherwise from the network
         const queryResult: any = await databaseConnection.manager.query(EthereumNetwork.QUERY_SELECT_FIRST_BLOCK_RPC);
-        // TODO does typeorm has get single result?
-        let startBlock: string | null = queryResult.length > 0 ?
+        // if it finds on the query convert the block id from integer to hexadecimal, otherwise null
+        let startBlock: string | null = queryResult.length > 0 && queryResult[0].startingBlock ?
             `0x${(parseInt(queryResult[0].startingBlock, 16) + 1).toString(16)}` : null;
+        // if it doesn't find, let's get the information from the Node by fetching the earliest block
         if (!startBlock) {
-            const responseEarliestBlock = await this.pullBlock("earliest");
+            const responseEarliestBlock = await this.pullBlock("earliest", null, false);
             startBlock = responseEarliestBlock ? responseEarliestBlock : "0x0";
         }
-
-        const responseLatestBlock = await this.pullBlock("latest");
-
-        // get the last block
+        // control the ETL running, by stopping with the last block at the moment the migration started
+        const responseLatestBlock = await this.pullBlock("latest", null, false);
         this.latestBlock = responseLatestBlock ? responseLatestBlock : "0x0";
 
+        // start the pulling of blocks with timed intervals to avoid throttling
         this.pullAllBlocks(startBlock);
     }
 
@@ -87,8 +87,9 @@ export default class EthereumNetwork extends BlockchainNetwork {
      * Method responsible for fetching blocks (with intermittent timeout to avoid throttling)
      * @param blockNumber the block number to do rpc call and get all information
      * @param retry variable to control recursive logic of retrying to fetch a block record
+     * @param insert flag to define if this pull operation should add the block on the database or not
      */
-    public async pullBlock(blockNumber: string, retry?: number | null): Promise<string | null> {
+    public async pullBlock(blockNumber: string, retry?: number | null, insert = true): Promise<string | null> {
         logger.debug(`Pulling blocks ${blockNumber}`);
 
         try {
@@ -105,12 +106,11 @@ export default class EthereumNetwork extends BlockchainNetwork {
             });
 
             const fetchedBlock = response.result;
-            if (fetchedBlock) {
+            if (fetchedBlock && insert) {
                 // pass the data to the extractor service so it can process there
                 this.databaseQueue.createJob("blocks", fetchedBlock).save();
-
-                return fetchedBlock.blockNumber;
             }
+            return fetchedBlock.number;
         } catch (e) {
             logger.error(e);
             if (!retry || retry < EthereumNetwork.MAX_RETRIES) {

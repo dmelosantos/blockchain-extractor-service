@@ -1,4 +1,4 @@
-import {Column, Entity, OneToMany, PrimaryColumn} from "typeorm";
+import {Column, Entity, Index, OneToMany, PrimaryColumn} from "typeorm";
 import {MigrationType} from "../commons/Constants";
 import Transaction from "./Transaction";
 
@@ -17,6 +17,7 @@ export default class Block {
     id: string;
 
     @Column({length: 255})
+    @Index()
     hash: string;
 
     @Column({length: 255})
@@ -56,15 +57,18 @@ export default class Block {
     extraData: string;
 
     @Column({length: 255})
+    @Index()
     gasLimit: string;
 
     @Column({length: 255})
+    @Index()
     gasUsed: string;
 
     @Column({length: 255})
     timestamp: string;
 
     @Column({nullable: true, length: 255})
+    @Index()
     transactionCount: string;
 
     @Column({
@@ -73,8 +77,7 @@ export default class Block {
     })
     migrationType: MigrationType;
 
-    @OneToMany((type) => Transaction, (transaction) => transaction.blockNumber,
-        {cascade: true})
+    @OneToMany((type) => Transaction, (transaction) => transaction.block, {cascade: true})
     transactions!: Transaction[];
 
     constructor(id: string, hash: string, parentHash: string, nonce: string, sha3Uncles: string,

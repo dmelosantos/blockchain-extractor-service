@@ -77,7 +77,7 @@ export default class ExtractorService {
 
             fetchedBlock.transactions.forEach((transactionData: any) => {
                 const transaction = new Transaction(transactionData.hash, transactionData.nonce,
-                    transactionData.blockHash, `${parseInt(transactionData.blockNumber, 16)}`,
+                    transactionData.blockHash, block,
                     transactionData.transactionIndex, transactionData.from, transactionData.to, transactionData.value,
                     transactionData.gasPrice, transactionData.gas, transactionData.input,
                     transactionData.v, transactionData.standardV, transactionData.r,

@@ -1,5 +1,6 @@
-import {Column, Entity, PrimaryColumn} from "typeorm";
+import {Column, Entity, Index, ManyToOne, PrimaryColumn} from "typeorm";
 import {MigrationType} from "../commons/Constants";
+import Block from "./Block";
 
 @Entity()
 export default class Transaction {
@@ -13,11 +14,14 @@ export default class Transaction {
 
     /** blockHash: Hash - 32 Bytes - hash of the block where this transaction was in. null when its pending. */
     @Column({length: 255})
+    @Index()
     blockHash: string;
 
-    /** blockNumber: Quantity or Tag - block number where this transaction was in. null when its pending. */
-    @Column({length: 255})
-    blockNumber: string;
+    /** id from the table Block representing the field blockNumber:
+     * Quantity or Tag - block number where this transaction was in. null when its pending. */
+    @ManyToOne((type) => Block, (block) => block.transactions)
+    @Index()
+    block: Block;
 
     /** transactionIndex: Quantity - integer of the transactions index position in the block. null when its pending. */
     @Column({length: 255})
@@ -25,10 +29,12 @@ export default class Transaction {
 
     /** from: Address - 20 Bytes - address of the sender. */
     @Column({length: 255})
+    @Index()
     from: string;
 
     /** to: Address - 20 Bytes - address of the receiver. null when its a contract creation transaction. */
     @Column({length: 255, nullable: true})
+    @Index()
     to: string;
 
     /** value: Quantity - value transferred in Wei. */
@@ -69,6 +75,7 @@ export default class Transaction {
 
     /** chainId: Quantity - the chain id of the transaction, if any. */
     @Column({length: 255, nullable: true})
+    @Index()
     chainId: string;
 
     /** creates: Hash - creates contract hash */
@@ -89,14 +96,14 @@ export default class Transaction {
     })
     migrationType: MigrationType;
 
-    constructor(hash: string, nonce: string, blockHash: string, blockNumber: string, transactionIndex: string,
+    constructor(hash: string, nonce: string, blockHash: string, block: Block, transactionIndex: string,
                 from: string, to: string, value: string, gasPrice: string, gas: string, input: string,
                 v: string, standardV: string, r: string, raw: string, publicKey: string, chainId: string,
                 creates: string, condition: string, migrationType: MigrationType) {
         this.hash = hash;
         this.nonce = nonce;
         this.blockHash = blockHash;
-        this.blockNumber = blockNumber;
+        this.block = block;
         this.transactionIndex = transactionIndex;
         this.from = from;
         this.to = to;
