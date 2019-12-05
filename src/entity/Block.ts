@@ -1,5 +1,6 @@
-import {Column, Entity, PrimaryColumn} from "typeorm";
+import {Column, Entity, OneToMany, PrimaryColumn} from "typeorm";
 import {MigrationType} from "../commons/Constants";
+import Transaction from "./Transaction";
 
 /**
  * Class representing blocks in Chain Networks
@@ -13,66 +14,68 @@ export default class Block {
     @PrimaryColumn({
         type: "bigint",
     })
-    private id: string;
+    id: string;
 
     @Column({length: 255})
-    private hash: string;
+    hash: string;
 
     @Column({length: 255})
-    private parentHash: string;
+    parentHash: string;
 
     @Column({nullable: true, length: 255})
-    private nonce: string;
-
-    @Column()
-    private sha3Uncles: string;
-
-    @Column({
-        length: 2048,
-    })
-    private logsBloom: string;
+    nonce: string;
 
     @Column({length: 255})
-    private transactionsRoot: string;
+    sha3Uncles: string;
+
+    @Column({length: 4096})
+    logsBloom: string;
 
     @Column({length: 255})
-    private stateRoot: string;
+    transactionsRoot: string;
 
     @Column({length: 255})
-    private receiptsRoot: string;
+    stateRoot: string;
 
     @Column({length: 255})
-    private miner: string;
+    receiptsRoot: string;
 
     @Column({length: 255})
-    private difficulty: string;
+    miner: string;
 
     @Column({length: 255})
-    private totalDifficulty: string;
+    difficulty: string;
 
     @Column({length: 255})
-    private size: string;
+    totalDifficulty: string;
 
     @Column({length: 255})
-    private extraData: string;
+    size: string;
 
     @Column({length: 255})
-    private gasLimit: string;
+    extraData: string;
 
     @Column({length: 255})
-    private gasUsed: string;
+    gasLimit: string;
 
     @Column({length: 255})
-    private timestamp: string;
+    gasUsed: string;
+
+    @Column({length: 255})
+    timestamp: string;
 
     @Column({nullable: true, length: 255})
-    private transactionCount: string;
+    transactionCount: string;
 
     @Column({
         enum: MigrationType,
         type: "enum",
     })
-    private migrationType: MigrationType;
+    migrationType: MigrationType;
+
+    @OneToMany((type) => Transaction, (transaction) => transaction.blockNumber,
+        {cascade: true})
+    transactions!: Transaction[];
 
     constructor(id: string, hash: string, parentHash: string, nonce: string, sha3Uncles: string,
                 logsBloom: string, transactionsRoot: string, stateRoot: string,

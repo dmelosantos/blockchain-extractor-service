@@ -61,7 +61,7 @@ export default class EthereumNetwork extends BlockchainNetwork {
         // get the last block
         this.latestBlock = responseLatestBlock ? responseLatestBlock : "0x0";
 
-        this.pullAllBlocks(startBlock);
+        this.pullAllBlocks(this.latestBlock);
     }
 
     /**

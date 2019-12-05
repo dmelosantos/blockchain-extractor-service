@@ -2,6 +2,7 @@ import {createQueue, Job, Queue} from "kue";
 import {Connection, createConnection} from "typeorm";
 import {Chain, MigrationType} from "../commons/Constants";
 import Block from "../entity/Block";
+import Transaction from "../entity/Transaction";
 import logger from "../logger";
 import BlockchainNetwork from "../model/networks/BlockchainNetwork";
 import EthereumNetwork from "../model/networks/EthereumNetwork";
@@ -37,6 +38,8 @@ export default class ExtractorService {
             throw new Error("Network Not Implemented");
         }
 
+        // process 20 jobs at a time
+        // TODO add configuration via secrets/process.env
         this.databaseQueue.setMaxListeners(20);
     }
 
@@ -70,9 +73,20 @@ export default class ExtractorService {
                 fetchedBlock.totalDifficulty, fetchedBlock.size, fetchedBlock.extraData, fetchedBlock.gasLimit,
                 fetchedBlock.gasUsed, fetchedBlock.timestamp, fetchedBlock.transactionCount, MigrationType.RPC);
 
-            console.log(block);
+            if (fetchedBlock.transactions && fetchedBlock.transactions.length > 0) { block.transactions = []; }
 
-            // await this.databaseConnection.manager.save(block);
+            fetchedBlock.transactions.forEach((transactionData: any) => {
+                const transaction = new Transaction(transactionData.hash, transactionData.nonce,
+                    transactionData.blockHash, `${parseInt(transactionData.blockNumber, 16)}`,
+                    transactionData.transactionIndex, transactionData.from, transactionData.to, transactionData.value,
+                    transactionData.gasPrice, transactionData.gas, transactionData.input,
+                    transactionData.v, transactionData.standardV, transactionData.r,
+                    transactionData.raw, transactionData.publicKey, transactionData.chainId,
+                    transactionData.creates, transactionData.condition, transactionData.migrationType);
+                block.transactions.push(transaction);
+            });
+
+            await this.databaseConnection.manager.save(block);
 
             done();
         });

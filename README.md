@@ -58,11 +58,17 @@ Backend repo with your Typescript ETL logic
 ## Architecture
 
 The API is a express app with the following:
+
 -> Abstract Chain Layer, the design is thought on using a BlockchainNetwork abstraction, so we can decouple the pulling and updating the data for any Chain (implemented only Ethereum)
+
 -> TypeORM for the database entities
+
 -> WebSocket to listen the realtime updates
+
 -> RPC and Polling to do the initial loading using queues (KUE implementation on Redis) to control the flow of the MySQL
+
 -> Socket.io to transmit to the UI realtime information
+
 -> Express Endpoints to access queries and processed results from MySQL
 
 ## Pulling information of Node frequency
