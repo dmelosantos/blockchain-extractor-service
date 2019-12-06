@@ -20,6 +20,7 @@ declare var process: {
         NETWORK_TYPE: string,
         WS_CONNECTION_STRING: string,
         RPC_CONNECTION_STRING: string,
+        SERVER_MODE: string,
     },
 };
 

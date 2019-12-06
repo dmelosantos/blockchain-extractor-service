@@ -1,10 +1,10 @@
-import {Queue} from "kue";
+import {response} from "express";
 import * as request from "request-promise-native";
 import {Connection} from "typeorm";
-import {query} from "winston";
 import WebSocket from "ws";
 import {MigrationType} from "../../commons/Constants";
 import logger from "../../logger";
+import ExtractorService from "../../service/ExtractorService";
 import BlockchainNetwork from "./BlockchainNetwork";
 
 export default class EthereumNetwork extends BlockchainNetwork {
@@ -18,23 +18,24 @@ export default class EthereumNetwork extends BlockchainNetwork {
 
     private static MAX_RETRIES: number = 10;
 
+    private static newHeadsSubscriptionId: string | null = null;
+
     // private socket!: Socket;
     private socket!: WebSocket;
 
     private latestBlock!: string;
-    private databaseQueue: Queue;
 
     constructor(chain: string, client: string, network: string, webSocketConnectionString: string,
-                rpcConnectionString: string, databaseQueue: Queue) {
+                rpcConnectionString: string) {
         super(chain, client, network, webSocketConnectionString, rpcConnectionString);
-
-        this.databaseQueue = databaseQueue;
     }
 
     /**
      * Connect websocket and other resources here
      */
     public connect(): void {
+        logger.debug("Connecting websocket");
+
         // this.socket = socketIo.connect(this.webSocketConnectionString);
         this.socket = new WebSocket(this.webSocketConnectionString);
     }
@@ -69,17 +70,43 @@ export default class EthereumNetwork extends BlockchainNetwork {
 
     /**
      * Method to poll on the Ethereum network with updated information
-     * Use this to connect to websockets and get realtime information using WebSockets
      *
+     * Use this to connect to websockets and get realtime information using WebSockets
+     * To keep the database up-to-date after an initial export-load this polling is running that detects new blocks
+     * and inserts on them on the database queue.
+     *
+     * From Parity Gitter:
+     * Every reorg will emit a bunch of newheads events for all the new blocks you see,
+     * it doesn't matter if you subscribe after the common block, because the subscription only shows you
+     * what parity is already keeping track of.
+     * The subscription is just "tell me about all the block headers you import as canonical"
+     *
+     * Following the stated above and since typeorm does upsert we can receive the new block even
+     * after it has already been inserted on the database
+     * and it will be update last (the queue guarantees this), thus reorgs logic working
      */
     public async poll(): Promise<void> {
 
         this.socket.on("open", function open() {
-            this.send("{\"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"eth_subscribe\", \"params\": [\"newPendingTransactions\"]}");
+            this.send("{\"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"eth_subscribe\", \"params\": [\"newHeads\"]}");
         });
 
         this.socket.on("message", function incoming(data: string) {
-            logger.debug(data);
+            const websocketResponse = JSON.parse(data);
+            // replying the first time with subscription ID
+            if (typeof websocketResponse.result === "string") {
+                EthereumNetwork.newHeadsSubscriptionId = websocketResponse.result;
+
+                logger.debug(`newsHead subscription id ${websocketResponse.result}`);
+            } else {
+                const fetchedBlock = websocketResponse.params.result;
+
+                logger.debug(`Storing new head block ${fetchedBlock.number}`);
+
+                fetchedBlock.migrationType = MigrationType.WS;
+                // pass the data to the extractor service so it can process there
+                ExtractorService.DATABASE_QUEUE.createJob("blocks", fetchedBlock).save();
+            }
         });
     }
 
@@ -93,7 +120,7 @@ export default class EthereumNetwork extends BlockchainNetwork {
         logger.debug(`Pulling blocks ${blockNumber}`);
 
         try {
-            const response = await request.post(this.rpcConnectionString, {
+            const rpcResponse = await request.post(this.rpcConnectionString, {
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -105,14 +132,20 @@ export default class EthereumNetwork extends BlockchainNetwork {
                 },
             });
 
-            const fetchedBlock = response.result;
-            if (fetchedBlock && insert) {
+            const fetchedBlock = rpcResponse.result;
+            if (fetchedBlock) {
+                // set the migration type to RPC to differentiate between new blocks imported on polling or via RPC
+                fetchedBlock.migrationType = MigrationType.RPC;
+
                 // pass the data to the extractor service so it can process there
-                this.databaseQueue.createJob("blocks", fetchedBlock).save();
+                if (insert) {
+                    ExtractorService.DATABASE_QUEUE.createJob("blocks", fetchedBlock).save();
+                }
+
+                return fetchedBlock.number;
             }
-            return fetchedBlock.number;
         } catch (e) {
-            logger.error(e);
+            logger.error(e.toString(), e);
             if (!retry || retry < EthereumNetwork.MAX_RETRIES) {
                 this.pullBlock(blockNumber, retry ? retry + 1 : 0);
             }

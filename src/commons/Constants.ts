@@ -17,3 +17,7 @@ export enum EthereumNetworkType {
 export enum MigrationType {
     WS, RPC,
 }
+
+export enum ServerMode {
+    LOAD, DYNAMIC, BOTH,
+}

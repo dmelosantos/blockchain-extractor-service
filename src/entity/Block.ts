@@ -47,7 +47,7 @@ export default class Block {
     @Column({length: 255})
     difficulty: string;
 
-    @Column({length: 255})
+    @Column({nullable: true, length: 255})
     totalDifficulty: string;
 
     @Column({length: 255})

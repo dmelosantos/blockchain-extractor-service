@@ -1,6 +1,6 @@
 import {createQueue, Job, Queue} from "kue";
 import {Connection, createConnection} from "typeorm";
-import {Chain, MigrationType} from "../commons/Constants";
+import {Chain, MigrationType, ServerMode} from "../commons/Constants";
 import Block from "../entity/Block";
 import Transaction from "../entity/Transaction";
 import logger from "../logger";
@@ -17,15 +17,15 @@ import EthereumNetwork from "../model/networks/EthereumNetwork";
 export default class ExtractorService {
 
     /**
-     * Abstraction for the Chain Network
-     */
-    private blockchain: BlockchainNetwork;
-
-    /**
      * Add jobs to this queue to persist events on the database, this allows to do multiple requests on the Chain Node
      * and queue request on the database in order to avoid performance problems
      */
-    private databaseQueue: Queue = createQueue();
+    public static DATABASE_QUEUE: Queue = createQueue();
+
+    /**
+     * Abstraction for the Chain Network
+     */
+    private blockchain: BlockchainNetwork;
 
     private databaseConnection!: Connection;
 
@@ -33,14 +33,14 @@ export default class ExtractorService {
                 rpcConnectionString: string) {
         if (chain === Chain.ETHEREUM) {
             this.blockchain = new EthereumNetwork(chain.toString(), client, network, webSocketConnectionString,
-                rpcConnectionString, this.databaseQueue);
+                rpcConnectionString);
         } else {
             throw new Error("Network Not Implemented");
         }
 
         // process 20 jobs at a time
         // TODO add configuration via secrets/process.env
-        this.databaseQueue.setMaxListeners(20);
+        ExtractorService.DATABASE_QUEUE.setMaxListeners(20);
     }
 
     /**
@@ -55,8 +55,20 @@ export default class ExtractorService {
 
         logger.debug("Database connected");
 
-        this.blockchain.pullData(this.databaseConnection);
+        const serverMode = process.env.SERVER_MODE;
+        if (serverMode === ServerMode.DYNAMIC.toString() ||
+            serverMode === ServerMode.BOTH.toString()) {
+            // start polling to update new blocks and reorgs
+            this.blockchain.connect();
+            this.blockchain.poll();
+        } else if (serverMode === ServerMode.DYNAMIC.toString() ||
+            serverMode === ServerMode.BOTH.toString()) {
+            // start ETL tasks for importing chain old blocks
+            // TODO change dynamically from initial load to dynamic importing
+            this.blockchain.pullData(this.databaseConnection);
+        }
 
+        // start queue processing for all events related to the chain that must be ordered and controlled
         this.processQueue();
     }
 
@@ -64,28 +76,31 @@ export default class ExtractorService {
      * Receive information from blockchain network and adds them to the database
      */
     private processQueue(): void {
-        this.databaseQueue.process("blocks", 20, async (job: Job, done: () => void) => {
-
+        ExtractorService.DATABASE_QUEUE.process("blocks", 20, async (job: Job, done: () => void) => {
             const fetchedBlock = job.data;
+
             const block = new Block(`${parseInt(fetchedBlock.number, 16)}`, fetchedBlock.hash, fetchedBlock.parentHash,
                 fetchedBlock.nonce, fetchedBlock.sha3Uncles, fetchedBlock.logsBloom, fetchedBlock.transactionsRoot,
                 fetchedBlock.stateRoot, fetchedBlock.receiptsRoot, fetchedBlock.miner, fetchedBlock.difficulty,
                 fetchedBlock.totalDifficulty, fetchedBlock.size, fetchedBlock.extraData, fetchedBlock.gasLimit,
-                fetchedBlock.gasUsed, fetchedBlock.timestamp, fetchedBlock.transactionCount, MigrationType.RPC);
+                fetchedBlock.gasUsed, fetchedBlock.timestamp, fetchedBlock.transactionCount,
+                fetchedBlock.migrationType);
 
-            if (fetchedBlock.transactions && fetchedBlock.transactions.length > 0) { block.transactions = []; }
+            if (fetchedBlock.transactions && fetchedBlock.transactions.length > 0) {
+                block.transactions = [];
 
-            fetchedBlock.transactions.forEach((transactionData: any) => {
-                const transaction = new Transaction(transactionData.hash, transactionData.nonce,
-                    transactionData.blockHash, block,
-                    transactionData.transactionIndex, transactionData.from, transactionData.to, transactionData.value,
-                    transactionData.gasPrice, transactionData.gas, transactionData.input,
-                    transactionData.v, transactionData.standardV, transactionData.r,
-                    transactionData.raw, transactionData.publicKey, transactionData.chainId,
-                    transactionData.creates, transactionData.condition, transactionData.migrationType);
-                block.transactions.push(transaction);
-            });
-
+                fetchedBlock.transactions.forEach((transactionData: any) => {
+                    const transaction = new Transaction(transactionData.hash, transactionData.nonce,
+                        transactionData.blockHash, block,
+                        transactionData.transactionIndex, transactionData.from, transactionData.to,
+                        transactionData.value,
+                        transactionData.gasPrice, transactionData.gas, transactionData.input,
+                        transactionData.v, transactionData.standardV, transactionData.r,
+                        transactionData.raw, transactionData.publicKey, transactionData.chainId,
+                        transactionData.creates, transactionData.condition, fetchedBlock.migrationType);
+                    block.transactions.push(transaction);
+                });
+            }
             await this.databaseConnection.manager.save(block);
 
             done();

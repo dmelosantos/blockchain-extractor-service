@@ -18,7 +18,9 @@ export default class Transaction {
     blockHash: string;
 
     /** id from the table Block representing the field blockNumber:
-     * Quantity or Tag - block number where this transaction was in. null when its pending. */
+     *
+     *  Quantity or Tag - block number where this transaction was in. null when its pending.
+     */
     @ManyToOne((type) => Block, (block) => block.transactions)
     @Index()
     block: Block;
