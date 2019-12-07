@@ -22,7 +22,7 @@ export default class EthereumService {
         if (databaseResults) {
             const topBalances: WalletBalance[] = [];
             databaseResults.forEach((result: any) => {
-                topBalances.push(new WalletBalance(result.balance, result.address));
+                topBalances.push(new WalletBalance(result.address, result.balance));
             });
             return topBalances;
         }
