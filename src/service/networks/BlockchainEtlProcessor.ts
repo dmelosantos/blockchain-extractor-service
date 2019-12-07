@@ -3,7 +3,7 @@
  */
 import {Connection} from "typeorm";
 
-export default abstract class BlockchainNetwork {
+export default abstract class BlockchainEtlProcessor {
     protected chain: string;
     protected client: string;
     protected network: string;
@@ -22,4 +22,5 @@ export default abstract class BlockchainNetwork {
     public abstract connect(): void;
     public abstract async pullData(databaseConnection: Connection): Promise<void>;
     public abstract poll(): void;
+    public abstract processQueue(): void;
 }

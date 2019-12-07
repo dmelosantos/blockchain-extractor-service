@@ -1,9 +1,9 @@
-import {Column, Entity, Index, OneToMany, PrimaryColumn} from "typeorm";
+import {Column, Entity, Index, OneToMany, PrimaryColumn, PrimaryGeneratedColumn} from "typeorm";
 import {MigrationType} from "../commons/Constants";
 import Transaction from "./Transaction";
 
 /**
- * Class representing blocks in Chain Networks
+ * Class representing logs in Ethereum Networks
  */
 @Entity()
 export default class Log {
@@ -14,7 +14,11 @@ export default class Log {
     @PrimaryColumn({
         type: "bigint",
     })
-    id: string;
+    id!: string;
+
+    @Column({length: 255})
+    @Index()
+    logIndex: string;
 
     @Column({length: 255})
     @Index()
@@ -47,9 +51,10 @@ export default class Log {
     })
     migrationType: MigrationType;
 
-    constructor(id: string, transactionHash: string, transactionIndex: string, blockHash: string,
+    constructor(id: string, logIndex: string, transactionHash: string, transactionIndex: string, blockHash: string,
                 blockNumber: string, address: string, data: string, topics: string, migrationType: MigrationType) {
         this.id = id;
+        this.logIndex = logIndex;
         this.transactionHash = transactionHash;
         this.transactionIndex = transactionIndex;
         this.blockHash = blockHash;

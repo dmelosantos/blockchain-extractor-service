@@ -59,7 +59,7 @@ Backend repo with your Typescript ETL logic
 
 The API is a express app with the following:
 
--> Abstract Chain Layer, the design is thought on using a BlockchainNetwork abstraction, so we can decouple the pulling and updating the data for any Chain (implemented only Ethereum)
+-> Abstract Chain Layer, the design is thought on using a BlockchainEtlProcessor abstraction, so we can decouple the pulling and updating the data for any Chain (implemented only Ethereum)
 
 -> TypeORM for the database entities
 

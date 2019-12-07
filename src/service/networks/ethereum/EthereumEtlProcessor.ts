@@ -1,20 +1,21 @@
-import {response} from "express";
 import * as request from "request-promise-native";
 import {Connection} from "typeorm";
 import WebSocket from "ws";
-import {MigrationType} from "../../commons/Constants";
-import logger from "../../logger";
-import ExtractorService from "../../service/ExtractorService";
-import BlockchainNetwork from "./BlockchainNetwork";
+import {MigrationType} from "../../../commons/Constants";
+import {delay} from "../../../commons/Utils";
+import logger from "../../../logger";
+import ExtractorService from "../../ExtractorService";
+import BlockchainEtlProcessor from "../BlockchainEtlProcessor";
+import EthereumQueueManager from "./EthereumQueueManager";
 
-export default class EthereumNetwork extends BlockchainNetwork {
+export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
 
     private static QUERY_SELECT_FIRST_BLOCK_RPC = `select max(id) as startingBlock from block where migrationType='${MigrationType.RPC}'`;
 
     /**
      * Static variable representing the timing interval to do request operations on the Nodes to avoid throttling
      */
-    private static PULL_DATA_INTERVAL: number = 500;
+    private static PULL_DATA_INTERVAL: number = 1000;
 
     private static MAX_RETRIES: number = 10;
 
@@ -33,6 +34,8 @@ export default class EthereumNetwork extends BlockchainNetwork {
     private socket!: WebSocket;
 
     private latestBlock!: string;
+
+    private queueManager: EthereumQueueManager = EthereumQueueManager.getInstance();
 
     constructor(chain: string, client: string, network: string, webSocketConnectionString: string,
                 rpcConnectionString: string) {
@@ -60,7 +63,8 @@ export default class EthereumNetwork extends BlockchainNetwork {
      */
     public async pullData(databaseConnection: Connection): Promise<void> {
         // fetch first block from the database if exists otherwise from the network
-        const queryResult: any = await databaseConnection.manager.query(EthereumNetwork.QUERY_SELECT_FIRST_BLOCK_RPC);
+        const queryResult: any = await databaseConnection.manager.query(
+            EthereumEtlProcessor.QUERY_SELECT_FIRST_BLOCK_RPC);
         // if it finds on the query convert the block id from integer to hexadecimal, otherwise null
         let startBlock: string | null = queryResult.length > 0 && queryResult[0].startingBlock ?
             `0x${(parseInt(queryResult[0].startingBlock, 16) + 1).toString(16)}` : null;
@@ -100,14 +104,14 @@ export default class EthereumNetwork extends BlockchainNetwork {
     public async poll(): Promise<void> {
 
         this.socket.on("open", function open() {
-            this.send(JSON.stringify(EthereumNetwork.NEW_HEADS_SUBSCRIPTION_JSON_RPC_PAYLOAD));
+            this.send(JSON.stringify(EthereumEtlProcessor.NEW_HEADS_SUBSCRIPTION_JSON_RPC_PAYLOAD));
         });
 
         this.socket.on("message", function incoming(data: string) {
             const websocketResponse = JSON.parse(data);
             // replying the first time with subscription ID
             if (typeof websocketResponse.result === "string") {
-                EthereumNetwork.newHeadsSubscriptionId = websocketResponse.result;
+                EthereumEtlProcessor.newHeadsSubscriptionId = websocketResponse.result;
 
                 logger.debug(`newsHead subscription id ${websocketResponse.result}`);
             } else {
@@ -158,22 +162,68 @@ export default class EthereumNetwork extends BlockchainNetwork {
             }
         } catch (e) {
             logger.error(e.toString(), e);
-            if (!retry || retry < EthereumNetwork.MAX_RETRIES) {
+            if (!retry || retry < EthereumEtlProcessor.MAX_RETRIES) {
                 return this.pullBlock(blockNumber, retry ? retry + 1 : 0, insert);
             }
         }
         return null;
     }
 
+    public async pullLog(blockNumber: string, retry?: number | null, insert = true): Promise<string | null> {
+        logger.debug(`Pulling logs for ${blockNumber}`);
+
+        try {
+            const rpcResponse = await request.post(this.rpcConnectionString, {
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                json: {
+                    id: "1",
+                    jsonrpc: "2.0",
+                    method: "eth_getLogs",
+                    params: [{
+                        fromBlock: blockNumber,
+                        toBlock: blockNumber,
+                    }],
+                },
+            });
+
+            const fetchedLog = rpcResponse.result;
+            if (fetchedLog) {
+                // set the migration type to RPC to differentiate between new blocks imported on polling or via RPC
+                fetchedLog.migrationType = MigrationType.RPC;
+
+                // pass the data to the extractor service so it can process there
+                if (insert) {
+                    ExtractorService.DATABASE_QUEUE.createJob("logs", fetchedLog).save();
+                }
+
+                return fetchedLog.number;
+            }
+        } catch (e) {
+            logger.error(e.toString(), e);
+            if (!retry || retry < EthereumEtlProcessor.MAX_RETRIES) {
+                return this.pullLog(blockNumber, retry ? retry + 1 : 0, insert);
+            }
+        }
+        return null;
+    }
+
+    public processQueue(): void {
+        this.queueManager.processQueue();
+    }
+
     /**
      * Pull all blocks by setting timeouts to each call
      * @param currentBlock
      */
-    private pullAllBlocks(currentBlock: string) {
-        this.pullBlock(currentBlock);
+    public async pullAllBlocks(currentBlock: string) {
+        await this.pullBlock(currentBlock);
+        await this.pullLog(currentBlock);
+        await delay(EthereumEtlProcessor.PULL_DATA_INTERVAL);
 
         const nextBlock = `0x${(parseInt(currentBlock, 16) + 1).toString(16)}`;
-        // starting adding blockings to the queue
-        setTimeout(() => this.pullAllBlocks(nextBlock), EthereumNetwork.PULL_DATA_INTERVAL);
+
+        this.pullAllBlocks(nextBlock);
     }
 }
