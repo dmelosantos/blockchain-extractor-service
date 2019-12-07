@@ -73,6 +73,7 @@ export default class EthereumNetwork extends BlockchainNetwork {
         const responseLatestBlock = await this.pullBlock("latest", null, false);
         this.latestBlock = responseLatestBlock ? responseLatestBlock : "0x0";
 
+        logger.debug(`Starting migration from block:${startBlock}`);
         logger.debug(`Latest block: ${this.latestBlock}`);
 
         // start the pulling of blocks with timed intervals to avoid throttling
@@ -158,7 +159,7 @@ export default class EthereumNetwork extends BlockchainNetwork {
         } catch (e) {
             logger.error(e.toString(), e);
             if (!retry || retry < EthereumNetwork.MAX_RETRIES) {
-                return this.pullBlock(blockNumber, retry ? retry + 1 : 0);
+                return this.pullBlock(blockNumber, retry ? retry + 1 : 0, insert);
             }
         }
         return null;
