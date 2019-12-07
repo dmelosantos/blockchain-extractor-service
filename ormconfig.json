@@ -10,12 +10,6 @@
   "entities": [
     "src/entity/**/*.ts"
   ],
-  "migrations": [
-    "src/migration/**/*.ts"
-  ],
-  "subscribers": [
-    "src/subscriber/**/*.ts"
-  ],
   "supportBigNumbers": true,
   "bigNumberStrings": true
 }

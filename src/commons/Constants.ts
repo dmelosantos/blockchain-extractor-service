@@ -19,5 +19,5 @@ export enum MigrationType {
 }
 
 export enum ServerMode {
-    LOAD, DYNAMIC, BOTH,
+    LOAD = "LOAD", DYNAMIC = "DYNAMIC", BOTH = "BOTH",
 }

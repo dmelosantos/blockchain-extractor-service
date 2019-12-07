@@ -56,12 +56,14 @@ export default class ExtractorService {
         logger.debug("Database connected");
 
         const serverMode = process.env.SERVER_MODE;
+
         if (serverMode === ServerMode.DYNAMIC.toString() ||
             serverMode === ServerMode.BOTH.toString()) {
             // start polling to update new blocks and reorgs
             this.blockchain.connect();
             this.blockchain.poll();
-        } else if (serverMode === ServerMode.DYNAMIC.toString() ||
+        }
+        if (serverMode === ServerMode.LOAD.toString() ||
             serverMode === ServerMode.BOTH.toString()) {
             // start ETL tasks for importing chain old blocks
             // TODO change dynamically from initial load to dynamic importing
@@ -79,29 +81,37 @@ export default class ExtractorService {
         ExtractorService.DATABASE_QUEUE.process("blocks", 20, async (job: Job, done: () => void) => {
             const fetchedBlock = job.data;
 
-            const block = new Block(`${parseInt(fetchedBlock.number, 16)}`, fetchedBlock.hash, fetchedBlock.parentHash,
-                fetchedBlock.nonce, fetchedBlock.sha3Uncles, fetchedBlock.logsBloom, fetchedBlock.transactionsRoot,
-                fetchedBlock.stateRoot, fetchedBlock.receiptsRoot, fetchedBlock.miner, fetchedBlock.difficulty,
-                fetchedBlock.totalDifficulty, fetchedBlock.size, fetchedBlock.extraData, fetchedBlock.gasLimit,
-                fetchedBlock.gasUsed, fetchedBlock.timestamp, fetchedBlock.transactionCount,
-                fetchedBlock.migrationType);
+            try {
+                const block = new Block(`${parseInt(fetchedBlock.number, 16)}`, fetchedBlock.number,
+                    fetchedBlock.hash, fetchedBlock.parentHash,
+                    fetchedBlock.nonce, fetchedBlock.sha3Uncles, fetchedBlock.logsBloom, fetchedBlock.transactionsRoot,
+                    fetchedBlock.stateRoot, fetchedBlock.receiptsRoot, fetchedBlock.miner, fetchedBlock.difficulty,
+                    fetchedBlock.totalDifficulty, fetchedBlock.size, fetchedBlock.extraData, fetchedBlock.gasLimit,
+                    fetchedBlock.gasUsed, fetchedBlock.timestamp, fetchedBlock.transactionCount,
+                    fetchedBlock.migrationType);
 
-            if (fetchedBlock.transactions && fetchedBlock.transactions.length > 0) {
-                block.transactions = [];
+                if (fetchedBlock.transactions && fetchedBlock.transactions.length > 0) {
+                    block.transactions = [];
 
-                fetchedBlock.transactions.forEach((transactionData: any) => {
-                    const transaction = new Transaction(transactionData.hash, transactionData.nonce,
-                        transactionData.blockHash, block,
-                        transactionData.transactionIndex, transactionData.from, transactionData.to,
-                        transactionData.value,
-                        transactionData.gasPrice, transactionData.gas, transactionData.input,
-                        transactionData.v, transactionData.standardV, transactionData.r,
-                        transactionData.raw, transactionData.publicKey, transactionData.chainId,
-                        transactionData.creates, transactionData.condition, fetchedBlock.migrationType);
-                    block.transactions.push(transaction);
-                });
+                    fetchedBlock.transactions.forEach((transactionData: any) => {
+                        const transaction = new Transaction(transactionData.hash, transactionData.nonce,
+                            transactionData.blockHash, block,
+                            transactionData.transactionIndex, transactionData.from, transactionData.to,
+                            transactionData.value,
+                            transactionData.gasPrice, transactionData.gas, transactionData.input,
+                            transactionData.v, transactionData.standardV, transactionData.r,
+                            transactionData.raw, transactionData.publicKey, transactionData.chainId,
+                            transactionData.creates, transactionData.condition, fetchedBlock.migrationType);
+                        block.transactions.push(transaction);
+                    });
+                }
+                await this.databaseConnection.manager.save(block);
+            } catch (e) {
+                // TODO add to dead letter queue
+                logger.error(e.toString(), e);
+                logger.error("Failed block");
+                logger.error(fetchedBlock);
             }
-            await this.databaseConnection.manager.save(block);
 
             done();
         });

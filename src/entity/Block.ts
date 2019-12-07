@@ -16,6 +16,13 @@ export default class Block {
     })
     id: string;
 
+    /**
+     * Storing also the hexadecimal value for querying purposes
+     */
+    @Column({length: 255})
+    @Index()
+    blockNumber: string;
+
     @Column({length: 255})
     @Index()
     hash: string;
@@ -80,12 +87,14 @@ export default class Block {
     @OneToMany((type) => Transaction, (transaction) => transaction.block, {cascade: true})
     transactions!: Transaction[];
 
-    constructor(id: string, hash: string, parentHash: string, nonce: string, sha3Uncles: string,
+    constructor(id: string, blockNumber: string, hash: string, parentHash: string, nonce: string, sha3Uncles: string,
                 logsBloom: string, transactionsRoot: string, stateRoot: string,
                 receiptsRoot: string, miner: string, difficulty: string, totalDifficulty: string,
                 size: string, extraData: string, gasLimit: string, gasUsed: string,
-                timestamp: string, transactionCount: string, migrationType: MigrationType) {
+                timestamp: string, transactionCount: string,
+                migrationType: MigrationType) {
         this.id = id;
+        this.blockNumber = blockNumber;
         this.hash = hash;
         this.parentHash = parentHash;
         this.nonce = nonce;

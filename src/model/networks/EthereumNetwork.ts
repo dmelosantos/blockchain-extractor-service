@@ -20,6 +20,15 @@ export default class EthereumNetwork extends BlockchainNetwork {
 
     private static newHeadsSubscriptionId: string | null = null;
 
+    private static NEW_HEADS_SUBSCRIPTION_JSON_RPC_PAYLOAD: any = {
+        id: 1, jsonrpc: "2.0", method: "eth_subscribe", params: ["newHeads"],
+    };
+
+    /**
+     * https://ethereum.stackexchange.com/questions/12553/understanding-logs-and-log-blooms
+     */
+    private static TRANSFER_EVENT_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
     // private socket!: Socket;
     private socket!: WebSocket;
 
@@ -64,6 +73,8 @@ export default class EthereumNetwork extends BlockchainNetwork {
         const responseLatestBlock = await this.pullBlock("latest", null, false);
         this.latestBlock = responseLatestBlock ? responseLatestBlock : "0x0";
 
+        logger.debug(`Latest block: ${this.latestBlock}`);
+
         // start the pulling of blocks with timed intervals to avoid throttling
         this.pullAllBlocks(startBlock);
     }
@@ -88,7 +99,7 @@ export default class EthereumNetwork extends BlockchainNetwork {
     public async poll(): Promise<void> {
 
         this.socket.on("open", function open() {
-            this.send("{\"jsonrpc\":\"2.0\", \"id\": 1, \"method\": \"eth_subscribe\", \"params\": [\"newHeads\"]}");
+            this.send(JSON.stringify(EthereumNetwork.NEW_HEADS_SUBSCRIPTION_JSON_RPC_PAYLOAD));
         });
 
         this.socket.on("message", function incoming(data: string) {
@@ -147,7 +158,7 @@ export default class EthereumNetwork extends BlockchainNetwork {
         } catch (e) {
             logger.error(e.toString(), e);
             if (!retry || retry < EthereumNetwork.MAX_RETRIES) {
-                this.pullBlock(blockNumber, retry ? retry + 1 : 0);
+                return this.pullBlock(blockNumber, retry ? retry + 1 : 0);
             }
         }
         return null;
@@ -164,5 +175,4 @@ export default class EthereumNetwork extends BlockchainNetwork {
         // starting adding blockings to the queue
         setTimeout(() => this.pullAllBlocks(nextBlock), EthereumNetwork.PULL_DATA_INTERVAL);
     }
-
 }

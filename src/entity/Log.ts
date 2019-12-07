@@ -1,4 +1,4 @@
-import {Column, Entity, Index, OneToMany, PrimaryColumn, PrimaryGeneratedColumn} from "typeorm";
+import {Column, Entity, Index, OneToMany, PrimaryColumn} from "typeorm";
 import {MigrationType} from "../commons/Constants";
 import Transaction from "./Transaction";
 
@@ -6,12 +6,12 @@ import Transaction from "./Transaction";
  * Class representing blocks in Chain Networks
  */
 @Entity()
-export default class Receipt {
+export default class Log {
 
     /**
      * The ID represents the log index field
      */
-    @PrimaryGeneratedColumn({
+    @PrimaryColumn({
         type: "bigint",
     })
     id: string;
@@ -23,26 +23,23 @@ export default class Receipt {
     @Column({length: 255})
     transactionIndex: string;
 
-    @Column({length: 255})
+    @Column({nullable: true, length: 255})
+    @Index()
     blockHash: string;
 
     @Column({length: 255})
+    @Index()
     blockNumber: string;
 
     @Column({length: 255})
-    cumulativeGasUsed: string;
+    @Index()
+    address: string;
 
-    @Column({length: 255})
-    gasUsed: string;
+    @Column({type: "text"})
+    data: string;
 
-    @Column({length: 255})
-    contractAddress: string;
-
-    @Column({length: 255})
-    root: string;
-
-    @Column({length: 255})
-    status: string;
+    @Column({type: "text"})
+    topics: string;
 
     @Column({
         enum: MigrationType,
@@ -51,18 +48,15 @@ export default class Receipt {
     migrationType: MigrationType;
 
     constructor(id: string, transactionHash: string, transactionIndex: string, blockHash: string,
-                blockNumber: string, cumulativeGasUsed: string, gasUsed: string, contractAddress: string,
-                root: string, status: string, migrationType: MigrationType) {
+                blockNumber: string, address: string, data: string, topics: string, migrationType: MigrationType) {
         this.id = id;
         this.transactionHash = transactionHash;
         this.transactionIndex = transactionIndex;
         this.blockHash = blockHash;
         this.blockNumber = blockNumber;
-        this.cumulativeGasUsed = cumulativeGasUsed;
-        this.gasUsed = gasUsed;
-        this.contractAddress = contractAddress;
-        this.root = root;
-        this.status = status;
+        this.address = address;
+        this.data = data;
+        this.topics = topics;
         this.migrationType = migrationType;
     }
 }

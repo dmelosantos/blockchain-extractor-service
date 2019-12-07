@@ -21,7 +21,7 @@ Consider in the design the ability to keep a database up-to-date after an initia
 
 Expose a simple API endpoint to show some data. Some (non-mandatory) examples are:
 
-Balance of every Eth address on every day
+-Balance of every Eth address on every day
 
 -Top Ethereum Balances
 
