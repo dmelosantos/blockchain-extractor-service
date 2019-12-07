@@ -2,11 +2,12 @@ import dotenv from "dotenv";
 import express from "express";
 import path from "path";
 
-import http from "http";
-import { createQueue } from "kue";
 import "reflect-metadata";
+import "reflect-metadata"; // this shim is required
+import {createExpressServer} from "routing-controllers";
 import io from "socket.io";
 import {createConnection} from "typeorm";
+import {EthereumController} from "./api/EthereumController";
 import {Chain} from "./commons/Constants";
 import logger from "./logger";
 import ExtractorService from "./service/ExtractorService";
@@ -40,13 +41,14 @@ class ExpressApp {
     }
 
     private configureExpress(): void {
-        const app = express();
-        const httpServer = http.createServer(app);
+        const app = createExpressServer({
+            controllers: [EthereumController],
+        });
 
         // serve built vue app from here
         app.use(express.static(path.join(__dirname, "public")));
 
-        httpServer.listen(3000, () => {
+        app.listen(3000, () => {
             const extractorService = new ExtractorService(chain, client, network, webSocketConnectionString,
                 rpcConnectionString);
 

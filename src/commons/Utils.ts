@@ -1,3 +1,4 @@
+import BigNumber from "bignumber.js";
 import * as request from "request-promise-native";
 
 /**
@@ -20,4 +21,9 @@ export async function makeRpcCall(url: string, method: string, params: any[]): P
             params,
         },
     });
+}
+
+export function convertWeiToEth(value: string): string {
+    return new BigNumber(value, 10).multipliedBy("1").decimalPlaces(BigNumber.ROUND_DOWN)
+        .dividedBy("1000000000000000000").toString(10);
 }
