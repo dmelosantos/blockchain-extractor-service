@@ -23,6 +23,7 @@ declare var process: {
         SERVER_MODE: string,
         SERVER_PORT: number,
         SERVER_SOCKET_PORT: number,
+        SERVER_SOCKET_URL: string,
     },
 };
 
@@ -35,7 +36,9 @@ const webSocketConnectionString: string = process.env.WS_CONNECTION_STRING;
 const rpcConnectionString: string = process.env.RPC_CONNECTION_STRING;
 const chain = Chain[chainString as keyof typeof Chain];
 
-class ExpressApp {
+export default class ExpressApp {
+
+    public static SERVER_SOCKET_URL = process.env.SERVER_SOCKET_URL;
 
     public start(): void {
         this.configureExpress();
@@ -60,7 +63,7 @@ class ExpressApp {
 
             extractorService.start();
 
-            logger.info("listening on *:3000");
+            logger.info(`listening on *:${process.env.SERVER_PORT}`);
         });
     }
 }

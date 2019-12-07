@@ -1,5 +1,7 @@
 import {Job} from "kue";
+import io from "socket.io-client";
 import {getConnection} from "typeorm";
+import ExpressApp from "../../../app";
 import {MigrationType} from "../../../commons/Constants";
 import Block from "../../../entity/Block";
 import Log from "../../../entity/Log";
@@ -20,10 +22,13 @@ export default class EthereumQueueManager {
 
     private static instance: EthereumQueueManager;
 
+    private socket: SocketIOClient.Socket = io(ExpressApp.SERVER_SOCKET_URL);
+
     /**
      * Receive information from blockchain network and adds them to the database
      */
     public processQueue(): void {
+
         ExtractorService.DATABASE_QUEUE.process("blocks", 20, async (job: Job, done: () => void) => {
             const fetchedBlock = job.data;
 
@@ -52,6 +57,10 @@ export default class EthereumQueueManager {
                         block.transactions.push(transaction);
                     });
                 }
+                if (fetchedBlock.migrationType === MigrationType.WS) {
+                    this.socket.emit("newBlock", fetchedBlock);
+                }
+
                 await getConnection().manager.save(block);
             } catch (e) {
                 // TODO add to dead letter queue
@@ -88,7 +97,7 @@ export default class EthereumQueueManager {
 
         ExtractorService.DATABASE_QUEUE.process("traceTransactions", 20, async (job: Job, done: () => void) => {
             const fetchedTraces = job.data;
-            console.log(fetchedTraces)
+
             try {
                 const traces: any[] = [];
                 fetchedTraces.forEach((fetchedTrace: any) => {
