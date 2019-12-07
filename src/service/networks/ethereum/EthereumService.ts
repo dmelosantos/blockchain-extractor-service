@@ -1,6 +1,5 @@
 import fs from "fs";
 import {getConnection} from "typeorm";
-import {convertWeiToEth} from "../../../commons/Utils";
 import WalletBalance from "../../../entity/processed/WalletBalance";
 
 // this query was too big to be done on the code or via entity manager

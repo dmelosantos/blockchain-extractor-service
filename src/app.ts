@@ -3,11 +3,10 @@ import express from "express";
 import path from "path";
 
 import "reflect-metadata";
-import "reflect-metadata"; // this shim is required
 import {createExpressServer} from "routing-controllers";
-import io from "socket.io";
-import {createConnection} from "typeorm";
+import {createSocketServer} from "socket-controllers";
 import {EthereumController} from "./api/EthereumController";
+import {MessageController} from "./api/MessageController";
 import {Chain} from "./commons/Constants";
 import logger from "./logger";
 import ExtractorService from "./service/ExtractorService";
@@ -22,6 +21,8 @@ declare var process: {
         WS_CONNECTION_STRING: string,
         RPC_CONNECTION_STRING: string,
         SERVER_MODE: string,
+        SERVER_PORT: number,
+        SERVER_SOCKET_PORT: number,
     },
 };
 
@@ -43,12 +44,17 @@ class ExpressApp {
     private configureExpress(): void {
         const app = createExpressServer({
             controllers: [EthereumController],
+            cors: true,
+        });
+
+        createSocketServer(process.env.SERVER_SOCKET_PORT, {
+            controllers: [MessageController],
         });
 
         // serve built vue app from here
         app.use(express.static(path.join(__dirname, "public")));
 
-        app.listen(3000, () => {
+        app.listen(process.env.SERVER_PORT, () => {
             const extractorService = new ExtractorService(chain, client, network, webSocketConnectionString,
                 rpcConnectionString);
 

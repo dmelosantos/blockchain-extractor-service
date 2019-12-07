@@ -1,4 +1,3 @@
-import * as request from "request-promise-native";
 import {Connection} from "typeorm";
 import WebSocket from "ws";
 import {MigrationType} from "../../../commons/Constants";
@@ -30,12 +29,6 @@ export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
         id: 1, jsonrpc: "2.0", method: "eth_subscribe", params: ["newHeads"],
     };
 
-    /**
-     * https://ethereum.stackexchange.com/questions/12553/understanding-logs-and-log-blooms
-     */
-    private static TRANSFER_EVENT_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-
-    // private socket!: Socket;
     private socket!: WebSocket;
 
     private latestBlock!: string;
@@ -53,8 +46,8 @@ export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
     public connect(): void {
         logger.debug("Connecting websocket");
 
-        // this.socket = socketIo.connect(this.webSocketConnectionString);
         this.socket = new WebSocket(this.webSocketConnectionString);
+
     }
 
     /**
@@ -154,7 +147,7 @@ export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
                 if (insert) {
                     ExtractorService.DATABASE_QUEUE.createJob("blocks", fetchedBlock).save();
                     /**
-                     * TODO add logic to only enable this if the node support it
+                     * TODO add logic to only enable this if the Node support it
                      * pull transaction traces here, since we set the flag on the rpc call to fetch all the transactions
                      * along with the block
                      * we only need to fetch traces when the insert on database is true

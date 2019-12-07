@@ -1,8 +1,7 @@
-import {Body, Controller, Delete, Get, Param, Post, Put} from "routing-controllers";
-import {getConnection} from "typeorm";
+import {Get, JsonController, Param} from "routing-controllers";
 import EthereumService from "../service/networks/ethereum/EthereumService";
 
-@Controller()
+@JsonController()
 export class EthereumController {
 
     private service: EthereumService = EthereumService.getInstance();
@@ -12,10 +11,4 @@ export class EthereumController {
         const topBalances = await this.service.getTopBalances();
         return JSON.stringify(topBalances, null, 2);
     }
-
-    @Get("/users/:id")
-    getOne(@Param("id") id: number) {
-        return "This action returns user #" + id;
-    }
-
 }
