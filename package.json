@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "NODE_ENV=develop ts-node ./src/app.ts",
-    "start": "nodemon ./dist/app.js",
+    "prod": "NODE_ENV=production ts-node ./src/app.ts",
     "test": "jest --coverage",
     "lint": "tslint -c tslint.json 'src/**/*.ts'"
   },

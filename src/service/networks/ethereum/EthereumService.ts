@@ -3,7 +3,7 @@ import {getConnection} from "typeorm";
 import WalletBalance from "../../../entity/processed/WalletBalance";
 
 // this query was too big to be done on the code or via entity manager
-const TOP_BALANCES_SQL = fs.readFileSync(`${__dirname}/sql/topEthereumBalances.sql`, "utf8");
+const TOP_BALANCES_SQL = fs.readFileSync(`${process.cwd()}/sql/topEthereumBalances.sql`, "utf8");
 
 /**
  * Service class to access database functions and do queries or fetch entities

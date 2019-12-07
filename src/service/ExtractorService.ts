@@ -1,6 +1,7 @@
 import {createQueue, Job, Queue} from "kue";
 import {Connection, createConnection} from "typeorm";
 import {Chain, MigrationType, ServerMode} from "../commons/Constants";
+import {delay} from "../commons/Utils";
 import Block from "../entity/Block";
 import Log from "../entity/Log";
 import Transaction from "../entity/Transaction";
@@ -21,7 +22,11 @@ export default class ExtractorService {
      * Add jobs to this queue to persist events on the database, this allows to do multiple requests on the Chain Node
      * and queue request on the database in order to avoid performance problems
      */
-    public static DATABASE_QUEUE: Queue = createQueue();
+    public static DATABASE_QUEUE: Queue = createQueue({
+        redis: {
+            host: process.env.REDIS_URL ? process.env.REDIS_URL : "127.0.0.1" ,
+        },
+    });
 
     /**
      * Abstraction for the Chain Network
@@ -66,6 +71,10 @@ export default class ExtractorService {
         }
         if (serverMode === ServerMode.LOAD.toString() ||
             serverMode === ServerMode.BOTH.toString()) {
+
+            // initial server boot gives 429 error when trying to connect together with websocket
+            delay(500);
+
             // start ETL tasks for importing chain old blocks
             // TODO change dynamically from initial load to dynamic importing
             this.blockchain.pullData(this.databaseConnection);

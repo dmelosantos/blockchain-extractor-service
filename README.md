@@ -1,58 +1,57 @@
 # blockchain-extractor-service
 Service that capture stream of information from Blockchain Networks and process them
 
+#Installation
 
-#Overview
-The work trial is a way for us to:
-Gauge your interest in the position
-Assess your technical abilities related to the role
-See how quickly you can get up to speed on the cryptocurrency and blockchain space
+## Without Docker
+First install node 12
 
-#Requirements
-Create a streaming ETL pipeline for extracting blockchain (Ethereum) data into a database (Mysql) instance needed for building and executing general SQL queries.
+On the project dir:
+```shell script
+npm install
+```
 
-Create a Typescript server/job/script to pull data from an Ethereum client (ie. Parity) and push it to a Mysql instance.
+To start the server
 
-Client will be Ethereum, but consider in the design that it may be another blockchain network.
+```shell script
+npm run dev
+```
 
-Database will be Mysql, but consider in the design that it may be other type of database.
+That's it, the server will start on the port 5000
 
-Consider in the design the ability to keep a database up-to-date after an initial export-load. ie. have a cron-job running that detects new blocks and uploads them to the database handling reorgs.
+There is the route for the top balances http://localhost:5000/top/balances
 
-Expose a simple API endpoint to show some data. Some (non-mandatory) examples are:
+And the VUE application will run on http://localhost:5000
 
--Balance of every Eth address on every day
+You can change all configs on the .env file
 
--Top Ethereum Balances
+## With Docker
 
--USD volume per token over time
+Install Docker on your machine
 
--Block rewards daily by miner
+Also install Docker Compose
 
--Hashrate by day
+Go to project root folder and run the following command:
 
-Others you think would be relevant and interesting as an end user.
+```shell script
+docker build -t blockchain-extractor .
+```
 
-Create a simple FE in a modern framework (Vue or React preferred) to display the data. As a backend engineer this can be very simple (ie. 1 page with dropdown and a graph).
+Then:
 
-Containerize with Docker so it can be easily built and run.
+```shell script
+docker run -p 5000:5000 -p 5001:5001 -d blockchain-extractor
+```
 
-#Resources
+And
 
-Owned node: we can give you a free account. https://app.deploy.radar.tech/
+```shell script
+docker-compose up
+```
 
-https://github.com/blockchain-etl/ethereum-etl . Sample python ETL. You can copy the modeling from there, but its design is a bit inflexible to us (limited export options, no option to ‘update’ a database)
+That's it!
 
-Typeorm (multi-database support): https://github.com/typeorm/typeorm
-
-#Network clients
-
-https://github.com/paritytech/parity-ethereum/
-
-https://github.com/ethereum/go-ethereum/wiki/geth
-
-#Deliverables
-Backend repo with your Typescript ETL logic
+Access your server on http://localhost:5000/
 
 # Decisions
 ## Architecture
@@ -105,6 +104,8 @@ So the server receive in pure WebSocket from the Chain Node and emit a broadcast
 The UI has the top balances query as a sample, the realtime blocks and transaction appearing
 
 Notes on the code: there is TODO and Refactors on the code on purpose, they don't mean I was lazy, it was because I limited the scope as to show a real daily to daily coding from my side.
+
+## TODO
 
 Until december 7th TODOs:
 - Add unit tests
