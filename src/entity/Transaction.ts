@@ -52,7 +52,7 @@ export default class Transaction {
     gas: string;
 
     /** input: Data - the data send along with the transaction. */
-    @Column({length: 4096})
+    @Column({type: "text"})
     input: string;
 
     /** v: Quantity - the standardised V field of the signature. */
@@ -68,7 +68,7 @@ export default class Transaction {
     r: string;
 
     /** raw: Data - raw transaction data */
-    @Column({length: 4096})
+    @Column({type: "text"})
     raw: string;
 
     /** publicKey: Hash - public key of the signer. */

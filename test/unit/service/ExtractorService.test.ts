@@ -4,7 +4,8 @@ import ExtractorService from "../../../src/service/ExtractorService";
 describe("ExtractorService Test Suite", () => {
     it("Should initialize the extractor service with an Ethereum Network", () => {
         const extractorService: ExtractorService = new ExtractorService(Chain.ETHEREUM,
-            EthereumNetworkType.KOVAN.toString(), EthereumClient.PARITY.toString(), "anything");
+            EthereumNetworkType.KOVAN.toString(), EthereumClient.PARITY.toString(),
+            "anything", "anything");
         expect(extractorService).toBeDefined();
     });
 });

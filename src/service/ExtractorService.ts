@@ -41,7 +41,7 @@ export default class ExtractorService {
 
         // process 20 jobs at a time
         // TODO add configuration via secrets/process.env
-        ExtractorService.DATABASE_QUEUE.setMaxListeners(40);
+        ExtractorService.DATABASE_QUEUE.setMaxListeners(60);
     }
 
     /**

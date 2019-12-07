@@ -2,12 +2,17 @@ import * as request from "request-promise-native";
 import {Connection} from "typeorm";
 import WebSocket from "ws";
 import {MigrationType} from "../../../commons/Constants";
-import {delay} from "../../../commons/Utils";
+import {delay, makeRpcCall} from "../../../commons/Utils";
 import logger from "../../../logger";
 import ExtractorService from "../../ExtractorService";
 import BlockchainEtlProcessor from "../BlockchainEtlProcessor";
 import EthereumQueueManager from "./EthereumQueueManager";
 
+/**
+ * Ethereum ETL Processor adds the logic to pull information from ethereum networks.
+ * Currently implemented: Blocks, Transactions, Logs, Traces
+ * TODO: Tokens, Token Transfers, Contracts and Receipts extraction
+ */
 export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
 
     private static QUERY_SELECT_FIRST_BLOCK_RPC = `select max(id) as startingBlock from block where migrationType='${MigrationType.RPC}'`;
@@ -15,7 +20,7 @@ export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
     /**
      * Static variable representing the timing interval to do request operations on the Nodes to avoid throttling
      */
-    private static PULL_DATA_INTERVAL: number = 1000;
+    private static PULL_DATA_INTERVAL: number = 500;
 
     private static MAX_RETRIES: number = 10;
 
@@ -66,8 +71,9 @@ export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
         const queryResult: any = await databaseConnection.manager.query(
             EthereumEtlProcessor.QUERY_SELECT_FIRST_BLOCK_RPC);
         // if it finds on the query convert the block id from integer to hexadecimal, otherwise null
-        let startBlock: string | null = queryResult.length > 0 && queryResult[0].startingBlock ?
-            `0x${(parseInt(queryResult[0].startingBlock, 16) + 1).toString(16)}` : null;
+        // let startBlock: string | null = queryResult.length > 0 && queryResult[0].startingBlock ?
+        //    `0x${(parseInt(queryResult[0].startingBlock, 16) + 1).toString(16)}` : null;
+        let startBlock = "0xE6361B";
         // if it doesn't find, let's get the information from the Node by fetching the earliest block
         if (!startBlock) {
             const responseEarliestBlock = await this.pullBlock("earliest", null, false);
@@ -81,7 +87,7 @@ export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
         logger.debug(`Latest block: ${this.latestBlock}`);
 
         // start the pulling of blocks with timed intervals to avoid throttling
-        this.pullAllBlocks(startBlock);
+        this.pullAll(startBlock);
     }
 
     /**
@@ -136,17 +142,8 @@ export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
         logger.debug(`Pulling blocks ${blockNumber}`);
 
         try {
-            const rpcResponse = await request.post(this.rpcConnectionString, {
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                json: {
-                    id: "1",
-                    jsonrpc: "2.0",
-                    method: "eth_getBlockByNumber",
-                    params: [blockNumber, true],
-                },
-            });
+            const rpcResponse = await makeRpcCall(this.rpcConnectionString,
+                "eth_getBlockByNumber", [blockNumber, true]);
 
             const fetchedBlock = rpcResponse.result;
             if (fetchedBlock) {
@@ -156,6 +153,18 @@ export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
                 // pass the data to the extractor service so it can process there
                 if (insert) {
                     ExtractorService.DATABASE_QUEUE.createJob("blocks", fetchedBlock).save();
+                    /**
+                     * TODO add logic to only enable this if the node support it
+                     * pull transaction traces here, since we set the flag on the rpc call to fetch all the transactions
+                     * along with the block
+                     * we only need to fetch traces when the insert on database is true
+                     * save traces on a different queue
+                     *  if (fetchedBlock.transactions && fetchedBlock.transactions.length > 0) {
+                     *     for (const transactionData of fetchedBlock.transactions) {
+                     *        await this.pullTraceTransaction(transactionData.hash);
+                     *     }
+                     *  }
+                     */
                 }
 
                 return fetchedBlock.number;
@@ -169,24 +178,55 @@ export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
         return null;
     }
 
+    /**
+     * Get trace information for transactions
+     *
+     * @param transactionHash
+     * @param retry
+     * @param insert
+     */
+    public async pullTraceTransaction(transactionHash: string, retry?: number | null,
+                                      insert = true): Promise<string | null> {
+        logger.debug(`Pulling trace transactions ${transactionHash}`);
+
+        try {
+            const rpcResponse = await makeRpcCall(this.rpcConnectionString,
+                "trace_transaction", [transactionHash]);
+
+            const fetchedTrace = rpcResponse.result;
+            if (fetchedTrace) {
+                // set the migration type to RPC to differentiate between new blocks imported on polling or via RPC
+                fetchedTrace.migrationType = MigrationType.RPC;
+
+                // pass the data to the extractor service so it can process there
+                if (insert) {
+                    ExtractorService.DATABASE_QUEUE.createJob("traceTransactions", fetchedTrace).save();
+                }
+
+                return fetchedTrace;
+            }
+        } catch (e) {
+            logger.error(e.toString(), e);
+            if (!retry || retry < EthereumEtlProcessor.MAX_RETRIES) {
+                return this.pullTraceTransaction(transactionHash, retry ? retry + 1 : 0, insert);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Method responsible to pull logs from blocks on the chain
+     *
+     * @param blockNumber which block number should be fetched (in hexadecimal)
+     * @param retry set the retry to a index 0 to MAX_RETRIES
+     * @param insert flag if this record should go to the database or not
+     */
     public async pullLog(blockNumber: string, retry?: number | null, insert = true): Promise<string | null> {
         logger.debug(`Pulling logs for ${blockNumber}`);
 
         try {
-            const rpcResponse = await request.post(this.rpcConnectionString, {
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                json: {
-                    id: "1",
-                    jsonrpc: "2.0",
-                    method: "eth_getLogs",
-                    params: [{
-                        fromBlock: blockNumber,
-                        toBlock: blockNumber,
-                    }],
-                },
-            });
+            const rpcResponse = await makeRpcCall(this.rpcConnectionString,
+                "eth_getLogs", [{ fromBlock: blockNumber, toBlock: blockNumber}]);
 
             const fetchedLog = rpcResponse.result;
             if (fetchedLog) {
@@ -209,21 +249,25 @@ export default class EthereumEtlProcessor extends BlockchainEtlProcessor {
         return null;
     }
 
+    /**
+     * Process queues for tasks related to processing and streaming tasks
+     */
     public processQueue(): void {
         this.queueManager.processQueue();
     }
 
     /**
-     * Pull all blocks by setting timeouts to each call
+     * Pull all blocks, logs and traces
+     *
      * @param currentBlock
      */
-    public async pullAllBlocks(currentBlock: string) {
+    public async pullAll(currentBlock: string) {
         await this.pullBlock(currentBlock);
         await this.pullLog(currentBlock);
         await delay(EthereumEtlProcessor.PULL_DATA_INTERVAL);
 
         const nextBlock = `0x${(parseInt(currentBlock, 16) + 1).toString(16)}`;
 
-        this.pullAllBlocks(nextBlock);
+        this.pullAll(nextBlock);
     }
 }

@@ -3,6 +3,8 @@ import {getConnection} from "typeorm";
 import {MigrationType} from "../../../commons/Constants";
 import Block from "../../../entity/Block";
 import Log from "../../../entity/Log";
+import Trace from "../../../entity/Trace";
+import TraceAction from "../../../entity/TraceAction";
 import Transaction from "../../../entity/Transaction";
 import logger from "../../../logger";
 import ExtractorService from "../../ExtractorService";
@@ -79,6 +81,32 @@ export default class EthereumQueueManager {
                 logger.error(e.toString(), e);
                 logger.error("Failed Log");
                 logger.error(fetchedLogs);
+            }
+
+            done();
+        });
+
+        ExtractorService.DATABASE_QUEUE.process("traceTransactions", 20, async (job: Job, done: () => void) => {
+            const fetchedTraces = job.data;
+            console.log(fetchedTraces)
+            try {
+                const traces: any[] = [];
+                fetchedTraces.forEach((fetchedTrace: any) => {
+                    const traceAction = new TraceAction(fetchedTrace.action.callType, fetchedTrace.action.from,
+                        fetchedTrace.action.gas, fetchedTrace.action.input, fetchedTrace.action.to,
+                        fetchedTrace.action.value);
+                    const trace = new Trace(traceAction, fetchedTrace.blockHash, fetchedTrace.blockNumber,
+                                            fetchedTrace.result.gasUsed, fetchedTrace.result.output,
+                                            fetchedTrace.subtraces, fetchedTrace.traceAddress.join(),
+                                            fetchedTrace.transactionHash, fetchedTrace.transactionPosition,
+                                            fetchedTrace.type, MigrationType.RPC);
+                });
+                await getConnection().manager.save(traces);
+            } catch (e) {
+                // TODO add to dead letter queue
+                logger.error(e.toString(), e);
+                logger.error("Failed Trace");
+                logger.error(fetchedTraces);
             }
 
             done();
