@@ -11,6 +11,10 @@ import Transaction from "../../../entity/Transaction";
 import logger from "../../../logger";
 import ExtractorService from "../../ExtractorService";
 
+/**
+ * Class responsible for managing the Ethereum long tasks queues
+ *
+ */
 export default class EthereumQueueManager {
 
     public static getInstance(): EthereumQueueManager {
@@ -26,6 +30,7 @@ export default class EthereumQueueManager {
 
     /**
      * Receive information from blockchain network and adds them to the database
+     * REFACTOR maybe separate the process from each queue type
      */
     public processQueue(): void {
 

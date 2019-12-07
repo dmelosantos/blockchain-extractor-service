@@ -1,6 +1,9 @@
 import {ConnectedSocket, MessageBody, OnConnect, OnDisconnect, OnMessage, SocketController, SocketIO} from "socket-controllers";
 import logger from "../logger";
 
+/**
+ * This is the Socket IO implementation to broadcast messages to the UI in realtime
+ */
 @SocketController()
 export class MessageController {
 
