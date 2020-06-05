@@ -58,7 +58,7 @@ Access your server on http://localhost:5000/
 
 The API is a express app with the following:
 
--> Abstract Chain Layer, the design is thought on using a BlockchainEtlProcessor abstraction, so we can decouple the pulling and updating the data for any Chain (implemented only Ethereum)
+-> Abstract Chain Layer, the design is thought on using a BlockchainEtlProcessor abstraction, so we can decouple the pulling and updating the data for any Chain
 
 -> TypeORM for the database entities
 
@@ -72,9 +72,7 @@ The API is a express app with the following:
 
 ## Pulling information of Node frequency
 
-I checked if the node had batch requests but it didn't. I used Radar Deploy Kovan Shared nodes.
-
-Without the batch requests I implemented pulling logics with delays to avoid 429 errors.
+If the Node has batch requests use it, in this implementation I considered the nodes to be without the batch requests I implemented pulling logics with delays to avoid throttling errors.
 
 Even if there is an error, retry logic has been implemented to fetch the records
 
@@ -107,7 +105,6 @@ Notes on the code: there is TODO and Refactors on the code on purpose, they don'
 
 ## TODO
 
-Until december 7th TODOs:
 - Add unit tests
 - Add integration tests
 - Add e2e tests
